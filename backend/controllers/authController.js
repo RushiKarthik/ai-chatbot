@@ -31,7 +31,20 @@ export const register = async (req, res) => {
       isVerified: false,
     });
 
-    await sendVerificationOtp(email, otp);
+    // Nested try/catch so an email connection/auth failure won't crash or freeze the request
+    try {
+      await sendVerificationOtp(email, otp);
+    } catch (emailError) {
+      console.error("Nodemailer Register Error: ", emailError.message);
+      
+      // Graceful fallback response containing the OTP for easy frontend testing
+      return res.status(201).json({
+        message: 'Account created, but failed to deliver OTP email. Use the debug OTP to verify.',
+        userId: user._id,
+        email: user.email,
+        debugOtp: otp // 👈 Copy this value out of your Network Tab response to verify!
+      });
+    }
 
     res.status(201).json({
       message: 'Registration successful. Please verify your email with OTP.',
@@ -91,7 +104,16 @@ export const resendOtp = async (req, res) => {
     user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    await sendVerificationOtp(email, otp);
+    try {
+      await sendVerificationOtp(email, otp);
+    } catch (emailError) {
+      console.error("Nodemailer Resend Error: ", emailError.message);
+      return res.json({ 
+        message: 'OTP regenerated, but email failed to send.',
+        debugOtp: otp 
+      });
+    }
+
     res.json({ message: 'OTP sent successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -149,7 +171,17 @@ export const forgotPassword = async (req, res) => {
     user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    await sendResetOtp(email, otp);
+    // Nested try/catch so a failing mail configurations won't crash forgotPassword
+    try {
+      await sendResetOtp(email, otp);
+    } catch (emailError) {
+      console.error("Nodemailer Forgot Password Error: ", emailError.message);
+      return res.status(200).json({ 
+        message: 'Reset OTP generated, but email delivery failed. Use debug OTP.',
+        debugOtp: otp // 👈 Allows your app flow to proceed on the front end!
+      });
+    }
+
     res.json({ message: 'Reset OTP sent to your email' });
   } catch (error) {
     res.status(500).json({ message: error.message });
