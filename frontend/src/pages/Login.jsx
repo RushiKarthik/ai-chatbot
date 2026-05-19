@@ -13,9 +13,9 @@ const Login = () => {
   const { loginUser } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {  
     e.preventDefault();
-    setError('');
+    setError('');  
     setLoading(true);
 
     try {
