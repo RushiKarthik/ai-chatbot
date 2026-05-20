@@ -1,4 +1,4 @@
-import axios from 'axios';
+
 
 // FORCE THE PRODUCTION RENDER SERVER ROOT DIRECTLY
 const API_URL = 'https://ai-chatbot-4-7r46.onrender.com';
