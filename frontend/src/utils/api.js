@@ -45,18 +45,19 @@ export const authAPI = {
 };
 
 // Chat API calls
+// ✅ CHAT API CALLS — UPDATED WITH /api FOR PRODUCTION SYNC
 export const chatAPI = {
-  getChats: () => apiRequest('/chats'),
-  getChat: (id) => apiRequest(`/chats/${id}`),
-  createChat: () => apiRequest('/chats', { method: 'POST' }),
-  deleteChat: (id) => apiRequest(`/chats/${id}`, { method: 'DELETE' }),
+  getChats: () => apiRequest('/api/chats'),
+  getChat: (id) => apiRequest(`/api/chats/${id}`),
+  createChat: () => apiRequest('/api/chats', { method: 'POST' }),
+  deleteChat: (id) => apiRequest(`/api/chats/${id}`, { method: 'DELETE' }),
   renameChat: (id, title) =>
-    apiRequest(`/chats/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
+    apiRequest(`/api/chats/${id}`, { method: 'PUT', body: JSON.stringify({ title }) }),
   sendMessage: (id, content) =>
-    apiRequest(`/chats/${id}/message`, { method: 'POST', body: JSON.stringify({ content }) }),
+    apiRequest(`/api/chats/${id}/message`, { method: 'POST', body: JSON.stringify({ content }) }),
   sendImageMessage: (id, formData) => {
     const token = localStorage.getItem('token');
-    return fetch(`${API_URL}/chats/${id}/image`, {
+    return fetch(`https://ai-chatbot-4-7r46.onrender.com/api/chats/${id}/image`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
@@ -66,4 +67,4 @@ export const chatAPI = {
       return data;
     });
   },
-};
+};  
