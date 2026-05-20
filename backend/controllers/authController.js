@@ -4,6 +4,13 @@ import { generateToken } from '../utils/generateToken.js';
 import { generateOtp } from '../utils/generateOtp.js';
 import { sendVerificationOtp, sendResetOtp } from '../services/emailService.js';
 
+// Helper function to prevent Nodemailer from hanging indefinitely on cloud hosts
+const emailTimeoutGate = (ms = 3500) => {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("SMTP Network Timeout")), ms)
+  );
+};
+
 // Register new user and send verification OTP
 export const register = async (req, res) => {
   try {
@@ -31,28 +38,32 @@ export const register = async (req, res) => {
       isVerified: false,
     });
 
-    // Nested try/catch so an email connection/auth failure won't crash or freeze the request
     try {
-      await sendVerificationOtp(email, otp);
+      // Race email sending against our 3.5s timeout gate
+      await Promise.race([
+        sendVerificationOtp(email, otp),
+        emailTimeoutGate()
+      ]);
+
+      return res.status(201).json({
+        message: 'Registration successful. Please verify your email with OTP.',
+        userId: user._id,
+        email: user.email,
+      });
+
     } catch (emailError) {
-      console.error("Nodemailer Register Error: ", emailError.message);
+      console.error("Nodemailer Register Bypassed: ", emailError.message);
       
-      // Graceful fallback response containing the OTP for easy frontend testing
+      // Graceful fallback response containing the OTP for easy frontend verification
       return res.status(201).json({
         message: 'Account created, but failed to deliver OTP email. Use the debug OTP to verify.',
         userId: user._id,
         email: user.email,
-        debugOtp: otp // 👈 Copy this value out of your Network Tab response to verify!
+        debugOtp: otp
       });
     }
-
-    res.status(201).json({
-      message: 'Registration successful. Please verify your email with OTP.',
-      userId: user._id,
-      email: user.email,
-    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -75,7 +86,7 @@ export const verifyOtp = async (req, res) => {
     user.otpExpiry = undefined;
     await user.save();
 
-    res.json({
+    return res.json({
       message: 'Email verified successfully',
       token: generateToken(user._id),
       user: {
@@ -85,7 +96,7 @@ export const verifyOtp = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -105,18 +116,22 @@ export const resendOtp = async (req, res) => {
     await user.save();
 
     try {
-      await sendVerificationOtp(email, otp);
+      await Promise.race([
+        sendVerificationOtp(email, otp),
+        emailTimeoutGate()
+      ]);
+
+      return res.json({ message: 'OTP sent successfully' });
+
     } catch (emailError) {
-      console.error("Nodemailer Resend Error: ", emailError.message);
+      console.error("Nodemailer Resend Bypassed: ", emailError.message);
       return res.json({ 
-        message: 'OTP regenerated, but email failed to send.',
+        message: 'OTP regenerated, but email failed to send. Use debug OTP.',
         debugOtp: otp 
       });
     }
-
-    res.json({ message: 'OTP sent successfully' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -143,7 +158,7 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    res.json({
+    return res.json({
       token: generateToken(user._id),
       user: {
         id: user._id,
@@ -152,7 +167,7 @@ export const login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -171,20 +186,26 @@ export const forgotPassword = async (req, res) => {
     user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
-    // Nested try/catch so a failing mail configurations won't crash forgotPassword
     try {
-      await sendResetOtp(email, otp);
+      await Promise.race([
+        sendResetOtp(email, otp),
+        emailTimeoutGate()
+      ]);
+
+      return res.json({ message: 'Reset OTP sent to your email' });
+
     } catch (emailError) {
-      console.error("Nodemailer Forgot Password Error: ", emailError.message);
+      console.error("Nodemailer Forgot Password Bypassed: ", emailError.message);
+      
+      // Instantly returns the OTP payload so your UI can shift into step 2 without hanging!
       return res.status(200).json({ 
         message: 'Reset OTP generated, but email delivery failed. Use debug OTP.',
-        debugOtp: otp // 👈 Allows your app flow to proceed on the front end!
+        debugOtp: otp 
       });
     }
-
-    res.json({ message: 'Reset OTP sent to your email' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Forgot Password Main Controller Failure: ", error.message);
+    return res.status(500).json({ message: error.message });
   }
 };
 
@@ -207,15 +228,15 @@ export const resetPassword = async (req, res) => {
     user.resetOtpExpiry = undefined;
     await user.save();
 
-    res.json({ message: 'Password reset successful' });
+    return res.json({ message: 'Password reset successful' });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
 // Get current user profile
 export const getProfile = async (req, res) => {
-  res.json({
+  return res.json({
     user: {
       id: req.user._id,
       name: req.user.name,
@@ -233,7 +254,7 @@ export const updateProfile = async (req, res) => {
     if (name) user.name = name;
     await user.save();
 
-    res.json({
+    return res.json({
       user: {
         id: user._id,
         name: user.name,
@@ -241,6 +262,6 @@ export const updateProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
