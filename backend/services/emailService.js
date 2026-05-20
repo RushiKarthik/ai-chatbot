@@ -1,62 +1,50 @@
-import nodemailer from 'nodemailer';
+import SibApiV3Sdk from '@getbrevo/brevo';
 
-// Create a reusable transporter using the official Gmail SMTP settings
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL/TLS for port 465
-  auth: {
-    user: process.env.EMAIL_USER, // Your full gmail address
-    pass: process.env.EMAIL_PASS, // Your 16-character Google App Password (no spaces)
-  },
-});
+// Initialize the Brevo API Client
+const defaultClient = SibApiV3Sdk.ApiClient.instance;
+const apiKey = defaultClient.authentications['api-key'];
 
-// Verify connection configuration on startup
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Nodemailer Transporter Verification Failed:', error.message);
-  } else {
-    console.log('Nodemailer is fully configured and ready to send emails! 🚀');
-  }
-});
+if (process.env.EMAIL_PASS) {
+  apiKey.apiKey = process.env.EMAIL_PASS; // This will hold your master xkeysib-... key
+  console.log("Brevo Email API Client mapped and verified! 🚀");
+} else {
+  console.error("CRITICAL ERROR: EMAIL_PASS environment variable is missing.");
+}
 
-// Function to send registration verification emails
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+
+// Send registration verification code
 export const sendVerificationOtp = async (email, otp) => {
-  const mailOptions = {
-    from: `"AI Chatbot Assistant" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Verify Your New Account - OTP Code',
-    text: `Welcome! Your 6-digit verification code is: ${otp}. It will expire in 10 minutes.`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-        <h2>Welcome to AI Chatbot!</h2>
-        <p>Please use the following One-Time Password (OTP) to verify your registration:</p>
-        <h1 style="color: #4f46e5; letter-spacing: 2px;">${otp}</h1>
-        <p style="font-size: 12px; color: #666;">This code expires in 10 minutes. If you did not request this, please ignore this email.</p>
-      </div>
-    `,
-  };
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  sendSmtpEmail.subject = "Verify Your Account - OTP";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+      <h2>Welcome to AI Chatbot!</h2>
+      <p>Please use the following One-Time Password (OTP) to verify your registration:</p>
+      <h1 style="color: #4f46e5; letter-spacing: 2px;">${otp}</h1>
+      <p style="font-size: 12px; color: #666;">This code expires in 10 minutes.</p>
+    </div>
+  `;
+  sendSmtpEmail.sender = { name: "AI Chatbot", email: process.env.EMAIL_USER };
+  sendSmtpEmail.to = [{ email: email }];
 
-  return transporter.sendMail(mailOptions);
+  return apiInstance.sendTransacEmail(sendSmtpEmail);
 };
 
-// Function to send forgot password reset emails
+// Send password reset code
 export const sendResetOtp = async (email, otp) => {
-  const mailOptions = {
-    from: `"AI Chatbot Support" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Password Reset Request - OTP Code',
-    text: `You requested a password reset. Your 6-digit OTP code is: ${otp}. It will expire in 10 minutes.`,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-        <h2>Password Reset Request</h2>
-        <p>We received a request to reset your password. Use the code below to proceed:</p>
-        <h1 style="color: #ef4444; letter-spacing: 2px;">${otp}</h1>
-        <p style="font-size: 12px; color: #666;">This code expires in 10 minutes. If you did not make this request, secure your account immediately.</p>
-      </div>
-    `,
-  };
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+  sendSmtpEmail.subject = "Password Reset Request - OTP";
+  sendSmtpEmail.htmlContent = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+      <h2>Password Reset Request</h2>
+      <p>We received a request to reset your password. Use the code below to proceed:</p>
+      <h1 style="color: #ef4444; letter-spacing: 2px;">${otp}</h1>
+      <p style="font-size: 12px; color: #666;">This code expires in 10 minutes.</p>
+    </div>
+  `;
+  sendSmtpEmail.sender = { name: "AI Chatbot Support", email: process.env.EMAIL_USER };
+  sendSmtpEmail.to = [{ email: email }];
 
-  return transporter.sendMail(mailOptions);
+  return apiInstance.sendTransacEmail(sendSmtpEmail);
 };
