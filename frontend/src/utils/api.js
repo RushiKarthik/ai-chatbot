@@ -1,4 +1,7 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// ✅ Change line 1 to this:
+const API_URL = import.meta.env.VITE_API_URL 
+  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` 
+  : 'http://localhost:5000/api';
 
 // Helper to make authenticated API requests
 export const apiRequest = async (endpoint, options = {}) => {
@@ -33,14 +36,14 @@ export const apiRequest = async (endpoint, options = {}) => {
 
 // Auth API calls
 export const authAPI = {
-  register: (body) => apiRequest('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
-  verifyOtp: (body) => apiRequest('/auth/verify-otp', { method: 'POST', body: JSON.stringify(body) }),
-  resendOtp: (body) => apiRequest('/auth/resend-otp', { method: 'POST', body: JSON.stringify(body) }),
-  login: (body) => apiRequest('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
-  forgotPassword: (body) => apiRequest('/auth/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
-  resetPassword: (body) => apiRequest('/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
-  getProfile: () => apiRequest('/auth/profile'),
-  updateProfile: (body) => apiRequest('/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
+  register: (body) => apiRequest('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  verifyOtp: (body) => apiRequest('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify(body) }),
+  resendOtp: (body) => apiRequest('/api/auth/resend-otp', { method: 'POST', body: JSON.stringify(body) }),
+  login: (body) => apiRequest('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  forgotPassword: (body) => apiRequest('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify(body) }),
+  resetPassword: (body) => apiRequest('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
+  getProfile: () => apiRequest('/api/auth/profile'),
+  updateProfile: (body) => apiRequest('/api/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
 // Chat API calls
