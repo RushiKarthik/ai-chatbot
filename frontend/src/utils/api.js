@@ -1,7 +1,5 @@
-// ✅ Change line 1 to this:
-const API_URL = import.meta.env.VITE_API_URL 
-  ? `${import.meta.env.VITE_API_URL.replace(/\/$/, '')}/api` 
-  : 'http://localhost:5000/api';
+// ✅ Force your live Render API server directly as the primary URL
+const API_URL = 'https://ai-chatbot-4-7r46.onrender.com/api';  
 
 // Helper to make authenticated API requests
 export const apiRequest = async (endpoint, options = {}) => {
