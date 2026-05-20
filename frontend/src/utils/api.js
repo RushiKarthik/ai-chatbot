@@ -1,5 +1,7 @@
-// ✅ Force your live Render API server directly as the primary URL
-const API_URL = 'https://ai-chatbot-4-7r46.onrender.com';  
+import axios from 'axios';
+
+// FORCE THE PRODUCTION RENDER SERVER ROOT DIRECTLY
+const API_URL = 'https://ai-chatbot-4-7r46.onrender.com';
 
 // Helper to make authenticated API requests
 export const apiRequest = async (endpoint, options = {}) => {
@@ -25,14 +27,14 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   if (!response.ok) {
     const error = new Error(data.message || 'Something went wrong');
-    error.data = data; // Extra info like needsVerification
+    error.data = data;
     throw error;
   }
 
   return data;
 };
 
-// Auth API calls
+// Auth API calls — Mapped with /api/auth
 export const authAPI = {
   register: (body) => apiRequest('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   verifyOtp: (body) => apiRequest('/api/auth/verify-otp', { method: 'POST', body: JSON.stringify(body) }),
@@ -44,9 +46,7 @@ export const authAPI = {
   updateProfile: (body) => apiRequest('/api/auth/profile', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
-// Chat API calls
-// ✅ CHAT API CALLS — UPDATED WITH /api FOR PRODUCTION SYNC
-// Chat API calls
+// Chat API calls — Mapped with /api/chats
 export const chatAPI = {
   getChats: () => apiRequest('/api/chats'),
   getChat: (id) => apiRequest(`/api/chats/${id}`),
@@ -58,14 +58,14 @@ export const chatAPI = {
     apiRequest(`/api/chats/${id}/message`, { method: 'POST', body: JSON.stringify({ content }) }),
   sendImageMessage: (id, formData) => {
     const token = localStorage.getItem('token');
-    return fetch('https://ai-chatbot-4-7r46.onrender.com/api/chats/' + id + '/image', {
+    return fetch(`${API_URL}/api/chats/${id}/image`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
     }).then(async (res) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Upload failed');
-      return data;
+      return data;  
     });
   },
 };
