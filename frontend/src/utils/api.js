@@ -46,6 +46,7 @@ export const authAPI = {
 
 // Chat API calls
 // ✅ CHAT API CALLS — UPDATED WITH /api FOR PRODUCTION SYNC
+// Chat API calls
 export const chatAPI = {
   getChats: () => apiRequest('/api/chats'),
   getChat: (id) => apiRequest(`/api/chats/${id}`),
@@ -57,7 +58,7 @@ export const chatAPI = {
     apiRequest(`/api/chats/${id}/message`, { method: 'POST', body: JSON.stringify({ content }) }),
   sendImageMessage: (id, formData) => {
     const token = localStorage.getItem('token');
-    return fetch(`https://ai-chatbot-4-7r46.onrender.com/api/chats/${id}/image`, {
+    return fetch('https://ai-chatbot-4-7r46.onrender.com/api/chats/' + id + '/image', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: formData,
@@ -67,4 +68,4 @@ export const chatAPI = {
       return data;
     });
   },
-};  
+};
