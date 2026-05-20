@@ -1,5 +1,5 @@
 // ✅ Force your live Render API server directly as the primary URL
-const API_URL = 'https://ai-chatbot-4-7r46.onrender.com/api';  
+const API_URL = 'https://ai-chatbot-4-7r46.onrender.com';  
 
 // Helper to make authenticated API requests
 export const apiRequest = async (endpoint, options = {}) => {
