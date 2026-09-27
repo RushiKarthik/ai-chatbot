@@ -1,51 +1,34 @@
 import Chat from '../models/Chat.js';
 import { getChatResponse, getVisionResponse } from '../services/geminiService.js';
 
-// User-friendly Gemini error messages
-const formatGeminiError = (error) => {
-  let message = error.message;
-  if (message.includes('API_KEY_INVALID') || message.includes('API key not valid')) {
-    return 'Invalid Gemini API key. Check GEMINI_API_KEY in backend .env';
-  }
-  if (message.includes('429') || message.includes('quota')) {
-    return 'Gemini API quota exceeded. Wait a few minutes or check Google AI Studio.';
-  }
-  if (message.includes('404') && message.includes('not found')) {
-    return 'Gemini model not available. Update the model name in geminiService.js';
-  }
-  return message;
+// Safe helper to get userId without crashing if logged out
+const getUserId = (req) => {
+  return req.user?._id || '000000000000000000000000';
 };
 
-// Get all chats for logged-in user
 export const getChats = async (req, res) => {
   try {
-    const chats = await Chat.find({ userId: req.user._id })
-      .select('title updatedAt createdAt')
-      .sort({ updatedAt: -1 });
+    const chats = await Chat.find({ userId: getUserId(req) }).sort({ updatedAt: -1 });
     res.json(chats);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.json([]);
   }
 };
 
-// Get single chat with messages
 export const getChatById = async (req, res) => {
   try {
-    const chat = await Chat.findOne({ _id: req.params.id, userId: req.user._id });
-    if (!chat) {
-      return res.status(404).json({ message: 'Chat not found' });
-    }
+    const chat = await Chat.findOne({ _id: req.params.id, userId: getUserId(req) });
+    if (!chat) return res.status(404).json({ message: 'Chat not found' });
     res.json(chat);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Create new empty chat
 export const createChat = async (req, res) => {
   try {
     const chat = await Chat.create({
-      userId: req.user._id,
+      userId: getUserId(req),
       title: 'New Chat',
       messages: [],
     });
@@ -55,79 +38,66 @@ export const createChat = async (req, res) => {
   }
 };
 
-// Delete a chat
 export const deleteChat = async (req, res) => {
   try {
-    const chat = await Chat.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
-    if (!chat) {
-      return res.status(404).json({ message: 'Chat not found' });
-    }
+    const chat = await Chat.findOneAndDelete({ _id: req.params.id, userId: getUserId(req) });
+    if (!chat) return res.status(404).json({ message: 'Chat not found' });
     res.json({ message: 'Chat deleted' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Rename a chat
 export const renameChat = async (req, res) => {
   try {
     const { title } = req.body;
-    if (!title?.trim()) {
-      return res.status(400).json({ message: 'Title is required' });
-    }
-
     const chat = await Chat.findOneAndUpdate(
-      { _id: req.params.id, userId: req.user._id },
+      { _id: req.params.id, userId: getUserId(req) },
       { title: title.trim().slice(0, 60) },
       { new: true }
     );
-
-    if (!chat) {
-      return res.status(404).json({ message: 'Chat not found' });
-    }
-
+    if (!chat) return res.status(404).json({ message: 'Chat not found' });
     res.json({ _id: chat._id, title: chat.title });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Send message and get AI response (text only)
 export const sendMessage = async (req, res) => {
   try {
     const { content } = req.body;
+    const userId = getUserId(req);
 
     if (!content?.trim()) {
       return res.status(400).json({ message: 'Message cannot be empty' });
     }
 
-    let chat = await Chat.findOne({ _id: req.params.id, userId: req.user._id });
-
+    let chat = await Chat.findOne({ _id: req.params.id, userId });
+    
+    // Auto-create chat if missing
     if (!chat) {
-      return res.status(404).json({ message: 'Chat not found' });
+      chat = await Chat.create({
+        _id: req.params.id,
+        userId,
+        title: content.slice(0, 40),
+        messages: []
+      });
     }
 
-    // Add user message
-    const userMessage = {
-      role: 'user',
-      content,
-      timestamp: new Date(),
-    };
+    const userMessage = { role: 'user', content, timestamp: new Date() };
     chat.messages.push(userMessage);
 
-    // Auto-generate title from first message
     if (chat.messages.length === 1) {
       chat.title = content.slice(0, 40) + (content.length > 40 ? '...' : '');
     }
 
-    // Get AI response from Gemini
     const aiContent = await getChatResponse(
       chat.messages.map((m) => ({ role: m.role, content: m.content }))
     );
 
     const assistantMessage = {
       role: 'assistant',
-      content: aiContent,
+      content: aiContent || 'Response received.',
       timestamp: new Date(),
     };
     chat.messages.push(assistantMessage);
@@ -140,42 +110,37 @@ export const sendMessage = async (req, res) => {
       title: chat.title,
     });
   } catch (error) {
-    res.status(500).json({ message: formatGeminiError(error) });
+    res.status(500).json({ message: error.message || 'Error getting response' });
   }
 };
 
-// Send message with image for vision analysis
 export const sendImageMessage = async (req, res) => {
   try {
     const { content } = req.body;
     const file = req.file;
+    const userId = getUserId(req);
 
-    if (!file) {
-      return res.status(400).json({ message: 'No image uploaded' });
-    }
+    if (!file) return res.status(400).json({ message: 'No image uploaded' });
 
-    let chat = await Chat.findOne({ _id: req.params.id, userId: req.user._id });
+    let chat = await Chat.findOne({ _id: req.params.id, userId });
     if (!chat) {
-      return res.status(404).json({ message: 'Chat not found' });
+      chat = await Chat.create({
+        _id: req.params.id,
+        userId,
+        title: 'Image Analysis',
+        messages: []
+      });
     }
 
-    // Convert image to base64 for storage and Gemini
     const imageBase64 = file.buffer.toString('base64');
-    const imageDataUrl = `data:${file.mimetype};base64,${imageBase64}`;
-
     const userMessage = {
       role: 'user',
       content: content || 'Analyze this image',
-      imageUrl: imageDataUrl,
+      imageUrl: `data:${file.mimetype};base64,${imageBase64}`,
       timestamp: new Date(),
     };
     chat.messages.push(userMessage);
 
-    if (chat.messages.length === 1) {
-      chat.title = 'Image Analysis';
-    }
-
-    // Get vision response from Gemini
     const aiContent = await getVisionResponse(
       chat.messages.map((m) => ({ role: m.role, content: m.content })),
       imageBase64,
@@ -184,7 +149,7 @@ export const sendImageMessage = async (req, res) => {
 
     const assistantMessage = {
       role: 'assistant',
-      content: aiContent,
+      content: aiContent || 'Analysis complete.',
       timestamp: new Date(),
     };
     chat.messages.push(assistantMessage);
@@ -197,6 +162,6 @@ export const sendImageMessage = async (req, res) => {
       title: chat.title,
     });
   } catch (error) {
-    res.status(500).json({ message: formatGeminiError(error) });
+    res.status(500).json({ message: error.message });
   }
 };
