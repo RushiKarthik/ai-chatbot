@@ -8,15 +8,22 @@ const getGroqClient = () => {
   return new Groq({ apiKey });
 };
 
-// Text completion handler matching expected controller export
+// Text completion handler - sanitizes input to ensure string format
 export const getChatResponse = async (prompt) => {
   try {
     const groq = getGroqClient();
+
+    // Extract text if prompt arrives as object/array from frontend
+    let userText = prompt;
+    if (typeof prompt === 'object' && prompt !== null) {
+      userText = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
+    }
+
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'user',
-          content: prompt,
+          content: String(userText || ''),
         },
       ],
       model: 'llama-3.3-70b-versatile',
@@ -29,16 +36,22 @@ export const getChatResponse = async (prompt) => {
   }
 };
 
-// Vision/Image completion handler fallback (or LLaMA 3.2 Vision if needed)
+// Vision completion handler
 export const getVisionResponse = async (prompt, imageBase64) => {
   try {
     const groq = getGroqClient();
+    
+    let textPrompt = prompt;
+    if (typeof prompt === 'object' && prompt !== null) {
+      textPrompt = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
+    }
+
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'user',
           content: [
-            { type: 'text', text: prompt },
+            { type: 'text', text: String(textPrompt || '') },
             {
               type: 'image_url',
               image_url: {
@@ -60,5 +73,4 @@ export const getVisionResponse = async (prompt, imageBase64) => {
   }
 };
 
-// Default fallback export
 export const generateResponse = getChatResponse;

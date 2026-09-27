@@ -1,76 +1,47 @@
-import Groq from 'groq-sdk';
+// Load .env FIRST before any other imports
+import 'dotenv/config';
 
-const getGroqClient = () => {
-  const apiKey = (process.env.GROQ_API_KEY || '').trim();
-  if (!apiKey) {
-    throw new Error('GROQ_API_KEY is missing in backend .env file');
-  }
-  return new Groq({ apiKey });
-};
+import express from 'express';
+import cors from 'cors';
+import { connectDB } from './config/db.js';
+import authRoutes from './routes/authRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import { errorHandler } from './middleware/errorMiddleware.js';
 
-// Text completion handler - sanitizes input to ensure string format
-export const getChatResponse = async (prompt) => {
-  try {
-    const groq = getGroqClient();
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-    // Extract text if prompt arrives as object/array from frontend
-    let userText = prompt;
-    if (typeof prompt === 'object' && prompt !== null) {
-      userText = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
+// Middleware
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allows any origin ending in .vercel.app or matching localhost, plus requests with no origin header
+    if (!origin || origin.endsWith('.vercel.app') || origin.includes('localhost')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
+  },
+  credentials: true
+}));
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: String(userText || ''),
-        },
-      ],
-      model: 'llama-3.3-70b-versatile',
-    });
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    return completion.choices[0]?.message?.content || '';
-  } catch (error) {
-    console.error('Groq API Error:', error);
-    throw error;
-  }
-};
+// Connect to MongoDB
+connectDB();
 
-// Vision completion handler
-export const getVisionResponse = async (prompt, imageBase64) => {
-  try {
-    const groq = getGroqClient();
-    
-    let textPrompt = prompt;
-    if (typeof prompt === 'object' && prompt !== null) {
-      textPrompt = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
-    }
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/chats', chatRoutes);
 
-    const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: String(textPrompt || '') },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageBase64.startsWith('data:') 
-                  ? imageBase64 
-                  : `data:image/jpeg;base64,${imageBase64}`,
-              },
-            },
-          ],
-        },
-      ],
-      model: 'llama-3.2-11b-vision-preview',
-    });
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'AI Chatbot API is running' });
+});
 
-    return completion.choices[0]?.message?.content || '';
-  } catch (error) {
-    console.error('Groq Vision API Error:', error);
-    throw error;
-  }
-};
+// Error handler
+app.use(errorHandler);
 
-export const generateResponse = getChatResponse;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
