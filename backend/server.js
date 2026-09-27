@@ -10,6 +10,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Mock Auth Handler to resolve frontend Login/Register requests
+const handleAuth = (req, res) => {
+  return res.json({
+    message: 'Success',
+    token: 'mock-jwt-token-12345',
+    user: {
+      id: '1',
+      email: req.body.email || 'user@example.com',
+      name: 'User'
+    }
+  });
+};
+
+// Listen on all possible Auth endpoints the frontend calls
+app.post('/api/auth/login', handleAuth);
+app.post('/api/auth/register', handleAuth);
+app.post('/api/login', handleAuth);
+app.post('/api/register', handleAuth);
+
 // Chat handler function
 const handleChatRequest = async (req, res) => {
   try {
