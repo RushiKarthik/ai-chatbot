@@ -1,14 +1,10 @@
 import Chat from '../models/Chat.js';
 import { getChatResponse, getVisionResponse } from '../services/geminiService.js';
 
-// Safe helper to get userId without crashing if logged out
-const getUserId = (req) => {
-  return req.user?._id || '000000000000000000000000';
-};
-
 export const getChats = async (req, res) => {
   try {
-    const chats = await Chat.find({ userId: getUserId(req) }).sort({ updatedAt: -1 });
+    const filter = req.user?._id ? { userId: req.user._id } : {};
+    const chats = await Chat.find(filter).sort({ updatedAt: -1 });
     res.json(chats);
   } catch (error) {
     res.json([]);
@@ -17,7 +13,7 @@ export const getChats = async (req, res) => {
 
 export const getChatById = async (req, res) => {
   try {
-    const chat = await Chat.findOne({ _id: req.params.id, userId: getUserId(req) });
+    const chat = await Chat.findById(req.params.id);
     if (!chat) return res.status(404).json({ message: 'Chat not found' });
     res.json(chat);
   } catch (error) {
@@ -27,20 +23,19 @@ export const getChatById = async (req, res) => {
 
 export const createChat = async (req, res) => {
   try {
-    const chat = await Chat.create({
-      userId: getUserId(req),
-      title: 'New Chat',
-      messages: [],
-    });
+    const chatData = { title: 'New Chat', messages: [] };
+    if (req.user?._id) chatData.userId = req.user._id;
+
+    const chat = await Chat.create(chatData);
     res.status(201).json(chat);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
 export const deleteChat = async (req, res) => {
   try {
-    const chat = await Chat.findOneAndDelete({ _id: req.params.id, userId: getUserId(req) });
+    const chat = await Chat.findByIdAndDelete(req.params.id);
     if (!chat) return res.status(404).json({ message: 'Chat not found' });
     res.json({ message: 'Chat deleted' });
   } catch (error) {
@@ -51,8 +46,8 @@ export const deleteChat = async (req, res) => {
 export const renameChat = async (req, res) => {
   try {
     const { title } = req.body;
-    const chat = await Chat.findOneAndUpdate(
-      { _id: req.params.id, userId: getUserId(req) },
+    const chat = await Chat.findByIdAndUpdate(
+      req.params.id,
       { title: title.trim().slice(0, 60) },
       { new: true }
     );
@@ -66,22 +61,15 @@ export const renameChat = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { content } = req.body;
-    const userId = getUserId(req);
-
     if (!content?.trim()) {
       return res.status(400).json({ message: 'Message cannot be empty' });
     }
 
-    let chat = await Chat.findOne({ _id: req.params.id, userId });
-    
-    // Auto-create chat if missing
+    let chat = await Chat.findById(req.params.id);
     if (!chat) {
-      chat = await Chat.create({
-        _id: req.params.id,
-        userId,
-        title: content.slice(0, 40),
-        messages: []
-      });
+      const chatData = { title: content.slice(0, 40), messages: [] };
+      if (req.user?._id) chatData.userId = req.user._id;
+      chat = await Chat.create(chatData);
     }
 
     const userMessage = { role: 'user', content, timestamp: new Date() };
@@ -97,7 +85,7 @@ export const sendMessage = async (req, res) => {
 
     const assistantMessage = {
       role: 'assistant',
-      content: aiContent || 'Response received.',
+      content: aiContent || 'Response generated.',
       timestamp: new Date(),
     };
     chat.messages.push(assistantMessage);
@@ -110,7 +98,7 @@ export const sendMessage = async (req, res) => {
       title: chat.title,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message || 'Error getting response' });
+    res.status(500).json({ message: error.message || 'Server error' });
   }
 };
 
@@ -118,18 +106,14 @@ export const sendImageMessage = async (req, res) => {
   try {
     const { content } = req.body;
     const file = req.file;
-    const userId = getUserId(req);
 
     if (!file) return res.status(400).json({ message: 'No image uploaded' });
 
-    let chat = await Chat.findOne({ _id: req.params.id, userId });
+    let chat = await Chat.findById(req.params.id);
     if (!chat) {
-      chat = await Chat.create({
-        _id: req.params.id,
-        userId,
-        title: 'Image Analysis',
-        messages: []
-      });
+      const chatData = { title: 'Image Analysis', messages: [] };
+      if (req.user?._id) chatData.userId = req.user._id;
+      chat = await Chat.create(chatData);
     }
 
     const imageBase64 = file.buffer.toString('base64');
