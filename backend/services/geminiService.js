@@ -8,24 +8,37 @@ const getGroqClient = () => {
   return new Groq({ apiKey });
 };
 
-// Text completion handler using reliable Groq model string
-export const getChatResponse = async (prompt) => {
+// Text completion handler (supports arrays of messages or single strings)
+export const getChatResponse = async (messagesInput) => {
   try {
     const groq = getGroqClient();
 
-    // Extract text if prompt arrives as object/array from frontend
-    let userText = prompt;
-    if (typeof prompt === 'object' && prompt !== null) {
-      userText = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
+    let formattedMessages = [];
+
+    if (Array.isArray(messagesInput)) {
+      // Map database messages to standard Groq role format
+      formattedMessages = messagesInput.map((msg) => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: String(msg.content || ''),
+      }));
+    } else if (typeof messagesInput === 'object' && messagesInput !== null) {
+      formattedMessages = [
+        {
+          role: 'user',
+          content: String(messagesInput.content || messagesInput.text || ''),
+        },
+      ];
+    } else {
+      formattedMessages = [
+        {
+          role: 'user',
+          content: String(messagesInput || ''),
+        },
+      ];
     }
 
     const completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'user',
-          content: String(userText || ''),
-        },
-      ],
+      messages: formattedMessages,
       model: 'llama-3.1-70b-versatile',
     });
 
@@ -37,13 +50,16 @@ export const getChatResponse = async (prompt) => {
 };
 
 // Vision completion handler
-export const getVisionResponse = async (prompt, imageBase64) => {
+export const getVisionResponse = async (messagesInput, imageBase64) => {
   try {
     const groq = getGroqClient();
-    
-    let textPrompt = prompt;
-    if (typeof prompt === 'object' && prompt !== null) {
-      textPrompt = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
+
+    let textPrompt = 'Analyze this image';
+    if (Array.isArray(messagesInput) && messagesInput.length > 0) {
+      const lastMsg = messagesInput[messagesInput.length - 1];
+      textPrompt = lastMsg.content || textPrompt;
+    } else if (typeof messagesInput === 'string') {
+      textPrompt = messagesInput;
     }
 
     const completion = await groq.chat.completions.create({
@@ -51,12 +67,12 @@ export const getVisionResponse = async (prompt, imageBase64) => {
         {
           role: 'user',
           content: [
-            { type: 'text', text: String(textPrompt || '') },
+            { type: 'text', text: String(textPrompt) },
             {
               type: 'image_url',
               image_url: {
-                url: imageBase64.startsWith('data:') 
-                  ? imageBase64 
+                url: imageBase64.startsWith('data:')
+                  ? imageBase64
                   : `data:image/jpeg;base64,${imageBase64}`,
               },
             },
