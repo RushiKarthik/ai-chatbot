@@ -8,7 +8,7 @@ const getGroqClient = () => {
   return new Groq({ apiKey });
 };
 
-// Text completion handler - sanitizes input to ensure string format
+// Text completion handler using reliable Groq model string
 export const getChatResponse = async (prompt) => {
   try {
     const groq = getGroqClient();
@@ -26,7 +26,7 @@ export const getChatResponse = async (prompt) => {
           content: String(userText || ''),
         },
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-70b-versatile',
     });
 
     return completion.choices[0]?.message?.content || '';
