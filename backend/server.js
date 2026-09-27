@@ -10,22 +10,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Main chat API route
-app.post('/api/chat', async (req, res) => {
+// Chat handler function
+const handleChatRequest = async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const prompt = req.body.prompt || req.body.message || req.body.content;
     
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
     const response = await getChatResponse(prompt);
-    return res.json({ response });
+    return res.json({ response, message: response });
   } catch (error) {
     console.error('Server error:', error);
     return res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
-});
+};
+
+// Listen on both /api/chat and /api/chats to match frontend calls
+app.post('/api/chat', handleChatRequest);
+app.post('/api/chats', handleChatRequest);
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
