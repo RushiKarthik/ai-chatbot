@@ -111,7 +111,7 @@ export const resendOtp = async (req, res) => {
     }
 
     const otp = generateOtp();
-    user.otp = otp;
+    user.otp = otp;    
     user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await user.save();
 
@@ -229,7 +229,7 @@ export const resetPassword = async (req, res) => {
     await user.save();
 
     return res.json({ message: 'Password reset successful' });
-  } catch (error) {
+  } catch (error) {          
     return res.status(500).json({ message: error.message });
   }
 };
