@@ -1,4 +1,4 @@
-// Load .env FIRST before any other imports (fixes Gemini API key not loading)
+// Load .env FIRST before any other imports
 import 'dotenv/config';
 
 import express from 'express';
@@ -12,16 +12,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-const allowedOrigins = [
-  'https://ai-chatbot-4-sigma.vercel.app',
-  'https://ai-chatbot-alpha-sable.vercel.app',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
-
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allows any origin ending in .vercel.app or matching localhost, plus requests with no origin header
+    if (!origin || origin.endsWith('.vercel.app') || origin.includes('localhost')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -29,6 +23,7 @@ app.use(cors({
   },
   credentials: true
 }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
