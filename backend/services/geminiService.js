@@ -8,7 +8,8 @@ const getGroqClient = () => {
   return new Groq({ apiKey });
 };
 
-export const generateResponse = async (prompt) => {
+// Text completion handler matching expected controller export
+export const getChatResponse = async (prompt) => {
   try {
     const groq = getGroqClient();
     const completion = await groq.chat.completions.create({
@@ -27,3 +28,37 @@ export const generateResponse = async (prompt) => {
     throw error;
   }
 };
+
+// Vision/Image completion handler fallback (or LLaMA 3.2 Vision if needed)
+export const getVisionResponse = async (prompt, imageBase64) => {
+  try {
+    const groq = getGroqClient();
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageBase64.startsWith('data:') 
+                  ? imageBase64 
+                  : `data:image/jpeg;base64,${imageBase64}`,
+              },
+            },
+          ],
+        },
+      ],
+      model: 'llama-3.2-11b-vision-preview',
+    });
+
+    return completion.choices[0]?.message?.content || '';
+  } catch (error) {
+    console.error('Groq Vision API Error:', error);
+    throw error;
+  }
+};
+
+// Default fallback export
+export const generateResponse = getChatResponse;
